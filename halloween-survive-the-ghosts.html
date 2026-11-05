@@ -636,6 +636,15 @@ const Sfx = (function(){
     care(){ tone(660, .12, 'triangle', .07, 1.5); }, pop(){ tone(520, .1, 'square', .05, 1.8); },
     spawn(){ tone(150, .5, 'sawtooth', .06, .5); }, danger(){ tone(95, .7, 'sawtooth', .09, .6); },
     hurt(){ tone(220, .35, 'square', .09, .4); }, over(){ tone(260, 1.2, 'sine', .1, .25); },
+    /* tap on a ghost that needs more taps: a dull thump + zap */
+    hit(){ tone(170, .1, 'triangle', .13, .5); tone(640, .08, 'square', .045, 1.7); },
+    /* ghost banished: a falling whoosh, then a bright rising chime */
+    banish(){
+      tone(900, .22, 'sawtooth', .05, .25); tone(180, .2, 'triangle', .09, .5);
+      setTimeout(() => { tone(660, .16, 'triangle', .08, 1.0); }, 110);
+      setTimeout(() => { tone(880, .16, 'triangle', .08, 1.0); }, 200);
+      setTimeout(() => { tone(1320, .3, 'sine', .09, 1.0); }, 290);
+    },
     boing(){ if(!Sfx.fx('jump', .5)) tone(300, .15, 'sine', .05, 1.6); },
     pat(){
       if(!Store.db.settings.sound) return; const c = ensure(); if(!c) return;
@@ -1513,7 +1522,7 @@ const Ghosts = {
   tapView(g){ if(g.badge) g.badge.textContent = g.hits; g.el.style.opacity = (.5 + .5 * g.hits / g.max).toFixed(2); },
   hit(g){
     if(g.max){
-      g.hits--; g.lastTap = S.t; Sfx.pop();
+      g.hits--; g.lastTap = S.t; if(g.hits > 0) Sfx.hit();
       if(g.hits > 0){ Ghosts.tapView(g); g.el.classList.remove('hit'); void g.el.offsetWidth; g.el.classList.add('hit'); return; }
     }
     Ghosts.kill(g);
@@ -1544,7 +1553,7 @@ const Ghosts = {
   drop(g, animate){
     if(S.carry === g) S.carry = null; g.carry = false;
     const p = Body.randomSpot(); Body.fall = { y:Math.max(Body.y, p.y) }; Body.x = clamp(Body.x, 8, 92); Body.wait = 2; Pet.addFear(CONFIG.grab.carry.dropFear);
-    if(animate){ Log.add('The ghost let go of the pet', 'good'); Sfx.pop(); }
+    if(animate){ Log.add('The ghost let go of the pet', 'good'); Sfx.banish(); }
     if(!animate && g.def){ }
     if(animate && g.el){ Ghosts.remove(g, true); }
   },
@@ -1574,7 +1583,7 @@ const Ghosts = {
     S.fear = clamp(S.fear - CONFIG.clickRelief.fear, 0, 100); S.happy = clamp(S.happy + CONFIG.clickRelief.happy, 0, 100);
     if(g.kind === 'blackout'){ S.lightsOn = true; Log.add('Lights on', 'good'); }
     if(g.kind === 'blanket') Log.add('Blanket put back on the bed', 'good');
-    Sfx.pop(); UI.floatText('Cleared!', g.x, g.y);
+    Sfx.banish(); UI.floatText('Cleared!', g.x, g.y);
     Ghosts.remove(g, true);
     Game.save();
   },
