@@ -169,7 +169,7 @@ body.devopen{padding-right:316px}
 @keyframes fw{0%{opacity:0}8%{opacity:.7}14%{opacity:0}32%{opacity:.4}38%{opacity:0}}
 @keyframes fr{0%{opacity:0}10%{opacity:.5}22%{opacity:0}55%{opacity:.35}66%{opacity:0}}
 .float{position:absolute;z-index:7;pointer-events:none;font:500 14px var(--f-display);color:var(--lamp);text-shadow:0 1px 3px #000;animation:rise 1.1s ease-out forwards;transform:translate(-50%,-50%);white-space:nowrap}
-.ghost{position:absolute;pointer-events:auto;transform:translate(-50%,-50%);width:64px;height:64px;min-width:48px;min-height:48px;padding:0;border:0;background:none;
+.ghost{scale:var(--gs,1);position:absolute;pointer-events:auto;transform:translate(-50%,-50%);width:64px;height:64px;min-width:48px;min-height:48px;padding:0;border:0;background:none;
   animation:appear .35s ease-out}
 .ghost svg{width:100%;height:100%;display:block;pointer-events:none;overflow:visible}
 .gi{width:100%;height:100%;display:block;pointer-events:none;object-fit:contain;-webkit-user-drag:none}
@@ -177,14 +177,14 @@ body.devopen{padding-right:316px}
 .balloon .em{vertical-align:middle;margin:-4px 2px;display:inline-block}
 .ghost.hand{width:68px;height:81px;transition:opacity .15s}
 .ghost.hand::after{content:"";position:absolute;inset:-14px}
-.prt{position:absolute;width:38px;height:21px;transform:translate(-50%,-50%) var(--tf,none);pointer-events:none;opacity:.7;animation:stamp .22s ease-out,prtfade 1.5s ease-in forwards}.prt.hp{width:42px;height:49px}@keyframes stamp{from{scale:1.9;opacity:0}60%{scale:.9}to{scale:1}}.prt svg,.prt .gi{width:100%;height:100%;display:block}
+.prt{scale:var(--gs,1);position:absolute;width:38px;height:21px;transform:translate(-50%,-50%) var(--tf,none);pointer-events:none;opacity:.7;animation:stamp .22s ease-out,prtfade 1.5s ease-in forwards}.prt.hp{width:42px;height:49px}@keyframes stamp{from{scale:1.9;opacity:0}60%{scale:.9}to{scale:1}}.prt svg,.prt .gi{width:100%;height:100%;display:block}
 @keyframes prtfade{to{opacity:0}}
 .ghost.carrying{filter:drop-shadow(0 0 12px var(--danger));animation:pulse .5s infinite alternate}
 .ghost.tall{width:80px;height:154px}.ghost.dl{width:58px;height:58px;min-width:44px;min-height:44px}.ghost.wk{width:94px;height:94px}
 .ghost.danger{filter:drop-shadow(0 0 10px var(--danger))}
 .ghost.marker{min-width:0;min-height:0;filter:none;width:20px;height:20px;border:1px solid #ff4d5e;border-radius:50%;background:transparent;color:#ff4d5e;font:700 10px/1 var(--f-display);text-shadow:0 0 2px #fff8,0 0 3px #0008;opacity:.7;animation:none}
 .ghost.marker::before{content:none}
-.ghost.marker::after{content:"";position:absolute;left:50%;top:50%;width:var(--hw,48px);height:var(--hh,48px);transform:translate(-50%,-50%)}
+.ghost.marker::after{content:"";position:absolute;left:50%;top:50%;width:calc(max(var(--hw,48px), 44px) / var(--gs,1));height:calc(max(var(--hh,48px), 44px) / var(--gs,1));transform:translate(-50%,-50%)}
 .ghost.marker{border-color:transparent;color:transparent;box-shadow:none;background:none;text-shadow:none}
 .ghost.marker.inv{border-color:transparent;color:transparent;box-shadow:none;background:none;text-shadow:none;opacity:1}.ghost.marker.inv::before{content:none}
 .ghost.out{animation:vanish .3s forwards;pointer-events:none}
@@ -267,7 +267,7 @@ body.devopen{padding-right:316px}
 @keyframes rise{from{opacity:1;transform:translate(-50%,-50%)}to{opacity:0;transform:translate(-50%,-190%)}}
 @keyframes dbotrise{from{opacity:0;transform:translate(-50%,-50%) scale(.5)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
 .ghost.dbot{transition:top 2.6s ease-out;animation:dbotrise .5s ease-out}
-@keyframes stampg{from{scale:1.7}to{scale:1}}.ghost.stp{animation:stampg .22s ease-out}
+@keyframes stampg{from{scale:calc(var(--gs,1) * 1.7)}to{scale:var(--gs,1)}}.ghost.stp{animation:stampg .22s ease-out}
 @keyframes hsway{0%,100%{rotate:-9deg}50%{rotate:11deg}}
 .ghost.dglow{filter:drop-shadow(0 0 5px var(--danger))}
 .ghost.redaura{filter:drop-shadow(0 0 3px #ff2a3d) drop-shadow(0 0 9px #d0102e) drop-shadow(0 0 18px #6a0012) drop-shadow(0 0 26px #000)}
@@ -1753,6 +1753,7 @@ const UI = {
       room.style.setProperty('--sy', sy + 'px'); room.style.setProperty('--sh', sh + 'px'); UI.extraB = (H - sy - sh) / sh * 100;
     }
     const r = scene.getBoundingClientRect(); if(!r.width) return; UI.sceneH = r.height;
+    scene.style.setProperty('--gs', Math.max(.5, Math.min(1.15, r.width / 636)).toFixed(3));   // ghosts keep the same size relative to the room on every screen
     let px = (UI.sizeOv != null ? UI.sizeOv : Pet.sizeFraction(S.t)) * r.height;
     const lim = v => Math.max(26, Math.min(v * r.height, r.height * .5, r.width * .5));
     if(DEV_ENABLED && !$('dev').hidden){ const o = $('devSize'); if(o){ const mn = CONFIG.sizeStops[0][1], mx = CONFIG.sizeCap; o.textContent = 'Pet size  now ' + Math.round(Math.max(26, Math.min(px, r.height * .5, r.width * .5))) + 'px (' + Math.round(px / r.height * 1000) / 10 + '%)  ·  min ' + Math.round(lim(mn)) + 'px (' + Math.round(mn * 1000) / 10 + '%)  ·  max ' + Math.round(lim(mx)) + 'px (' + Math.round(mx * 1000) / 10 + '%)' + (UI.sizeOv != null ? '  [locked]' : ''); } }
