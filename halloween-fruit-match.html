@@ -1,4 +1,9 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);color-scheme:dark}body{margin:0;font:14px system-ui,sans-serif}[hidden]{display:none!important}</style>
 <title>Halloween Fruit Match</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -129,6 +134,7 @@
   .levels button[aria-pressed="true"].hot { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
   button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
+  [hidden] { display: none !important; }
   .rule { margin: 0; text-align: center; font-size: 0.82rem; color: var(--muted); min-height: 1.2em; }
 
   /* Stage and flat table */
@@ -230,6 +236,9 @@
   }
   .leg.l { left: 22%; }
   .leg.r { right: 22%; }
+  .leg { transition: opacity 0.35s; }
+  .stage.ready .leg { opacity: 0; }
+  .stage.ready .card { cursor: default; }
   .stage.walking .card:not(.open):not(.drag):not(.hold) .leg.l { animation: stepL 0.46s ease-in-out infinite; }
   .stage.walking .card:not(.open):not(.drag):not(.hold) .leg.r { animation: stepL 0.46s ease-in-out -0.23s infinite; }
   @keyframes stepL { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-45%); } }
@@ -388,6 +397,8 @@
   }
 </style>
 
+</head>
+<body>
 <main class="app">
   <div class="head">
     <h1 id="title">Fruit Match</h1>
@@ -413,6 +424,11 @@
         <svg class="web tl" id="webTl" viewBox="0 0 100 100" aria-hidden="true"></svg>
         <svg class="web br" id="webBr" viewBox="0 0 100 100" aria-hidden="true"></svg>
       </div>
+    </div>
+    <div class="result" id="startPop" role="dialog" aria-label="Start game">
+      <h2>Ready?</h2>
+      <p>Find every matching pair as fast as you can.</p>
+      <button type="button" class="btn primary" id="start">Start game</button>
     </div>
     <div class="result" id="result" hidden aria-live="polite">
       <h2 id="resultTitle">All pairs found</h2>
@@ -486,12 +502,12 @@
   var stage = $("stage"), felt = $("felt"), timeEl = $("time"), timeBox = $("timeBox"),
       timeLabel = $("timeLabel"), movesEl = $("moves"), foundEl = $("found"), bestEl = $("best"),
       resultEl = $("result"), resultTitle = $("resultTitle"), resultText = $("resultText"),
-      ruleEl = $("rule"), titleEl = $("title"), levelsEl = $("levels");
+      ruleEl = $("rule"), titleEl = $("title"), levelsEl = $("levels"), startBtn = $("start"), startPop = $("startPop");
 
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var mode = "fruit", level = "normal", walk = !reduce;
   var cards = [], first = null, lock = false, moves = 0, matched = 0, pen = 0, nextSwap = 0,
-      startedAt = 0, finalMs = 0, finished = false, timer = null, gameId = 0,
+      startedAt = 0, finalMs = 0, finished = false, playing = false, timer = null, gameId = 0,
       PW = 200, PH = 400, cw = 40, ch = 56, rc = 25, drag = null;
   var art = { back: null, faces: {} };
 
@@ -597,22 +613,36 @@
     c.x = Math.max(e.l, Math.min(PW - e.r, c.x));
     c.y = Math.max(e.t, Math.min(PH - e.b, c.y));
   }
+  /* Ready screen: an even grid with no orphan row. Cards stand still until Start. */
   function place() {
-    var n = cards.length;
-    var cols = Math.max(1, Math.ceil(Math.sqrt(n * PW / PH)));
-    var rows = Math.ceil(n / cols);
-    var cellW = PW / cols, cellH = PH / rows;
-    var sp = LV[level].speed * cw;
+    var n = cards.length, best = null;
+    for (var k = 3; k <= 6; k++) {
+      var r = Math.ceil(n / k), empty = k * r - n, sc = Math.min(PW / k, PH / r / 1.4);
+      if (!best || empty < best.empty || (empty === best.empty && sc > best.sc)) { best = { k: k, r: r, empty: empty }; }
+    }
+    var cols = best.k, rows = best.r, cellW = PW / cols, cellH = PH / rows;
     cards.forEach(function (c, i) {
       var col = i % cols, row = Math.floor(i / cols);
-      var jx = Math.max(0, (cellW - cw) / 2) * 0.6, jy = Math.max(0, (cellH - ch) / 2) * 0.6;
-      c.x = col * cellW + cellW / 2 + (Math.random() * 2 - 1) * jx;
-      c.y = row * cellH + cellH / 2 + (Math.random() * 2 - 1) * jy;
-      var a = Math.random() * Math.PI * 2, v = sp * (0.7 + Math.random() * 0.6);
-      c.vx = Math.cos(a) * v; c.vy = Math.sin(a) * v;
-      c.rot = walk ? Math.atan2(c.vy, c.vx) + Math.PI / 2 : 0;
+      c.x = cellW * (col + 0.5) + (row === rows - 1 ? best.empty * cellW / 2 : 0);
+      c.y = cellH * (row + 0.5);
+      c.vx = 0; c.vy = 0; c.rot = 0;
       clampC(c);
     });
+  }
+  function launch() {
+    if (playing || finished) { return; }
+    var L = LV[level], sp = L.speed * cw, gid = gameId;
+    playing = true;
+    cards.forEach(function (c) {
+      var a = Math.random() * Math.PI * 2, v = sp * (0.7 + Math.random() * 0.6);
+      c.vx = Math.cos(a) * v; c.vy = Math.sin(a) * v;
+    });
+    stage.classList.remove("ready");
+    startedAt = Date.now();
+    if (L.swap) { nextSwap = startedAt + L.swap; }
+    timer = setInterval(function () { tickTimer(gid); }, 100);
+    startPop.hidden = true;
+    updateStats();
   }
   function rescaleSpeed() {
     var sp = LV[level].speed * cw;
@@ -639,8 +669,10 @@
     gameId++;
     clearInterval(timer); timer = null;
     startedAt = 0; finalMs = 0; first = null; lock = false; pen = 0; nextSwap = 0;
-    moves = 0; matched = 0; finished = false; drag = null;
+    moves = 0; matched = 0; finished = false; drag = null; playing = false;
     resultEl.hidden = true;
+    stage.classList.add("ready");
+    startPop.hidden = false;
     Array.prototype.slice.call(felt.querySelectorAll(".card")).forEach(function (el) { el.remove(); });
     cards = buildDeck().map(function (d, i) {
       var b = document.createElement("button");
@@ -696,13 +728,7 @@
 
   function flip(i) {
     var c = cards[i], L = LV[level];
-    if (!c || lock || finished || c.open || c.done) { return; }
-    if (!startedAt) {
-      var gid = gameId;
-      startedAt = Date.now();
-      if (L.swap) { nextSwap = startedAt + L.swap; }
-      timer = setInterval(function () { tickTimer(gid); }, 100);
-    }
+    if (!c || !playing || lock || finished || c.open || c.done) { return; }
     c.open = true; paint(c, i);
     if (first === null) { first = i; return; }
     var j = first, o = cards[j], id = gameId; first = null; moves++;
@@ -754,7 +780,7 @@
   function step(dt) {
     var live = cards.filter(function (c) { return !c.done; });
     live.forEach(function (c) {
-      var moving = walk && !isStatic(c);
+      var moving = walk && playing && !isStatic(c);
       var target = moving ? Math.atan2(c.vy, c.vx) + Math.PI / 2 : 0;
       var rate = (moving ? 3 : 7) * dt, diff = wrap(target - c.rot);
       c.rot += Math.max(-rate, Math.min(rate, diff));
@@ -798,7 +824,7 @@
   /* Tap to flip, drag to move. Touching or hovering a card makes it stand still. */
   stage.addEventListener("pointerdown", function (e) {
     var el = e.target.closest(".card");
-    if (!el || finished) { return; }
+    if (!el || finished || !playing) { return; }
     var i = +el.dataset.i, c = cards[i];
     if (!c || c.done) { return; }
     drag = { c: c, i: i, id: e.pointerId, sx: e.clientX, sy: e.clientY, p0: toFelt(e), ox: c.x, oy: c.y, moved: false };
@@ -867,6 +893,7 @@
     });
   }
   bindSeg("levels", "level", function (v) { level = v; });
+  startBtn.addEventListener("click", launch);
   $("restart").addEventListener("click", reset);
   $("again").addEventListener("click", reset);
 
@@ -875,7 +902,9 @@
     var w = felt.clientWidth, h = felt.clientHeight;
     if (!w || !h || (Math.abs(w - PW) < 2 && Math.abs(h - PH) < 2)) { return; }
     var ow = PW, oh = PH;
-    layoutStage(); cardSize(); sizeCards(); rescaleSpeed();
+    layoutStage(); cardSize(); sizeCards();
+    if (!playing) { place(); return; }
+    rescaleSpeed();
     cards.forEach(function (c) { c.x *= PW / ow; c.y *= PH / oh; clampC(c); });
   }
   if (window.ResizeObserver) { new ResizeObserver(onResize).observe(stage); }
@@ -1049,5 +1078,5 @@
   initBackend();
 })();
 </script>
-
-</body></html>
+</body>
+</html>
