@@ -516,7 +516,7 @@ const CONFIG = {
            [900,'🔮','House Exorcist'], [1200,'👑','Master of Sleepless Nights'], [1800,'🌟','Haunted-House Legend'] ],
   /* spread: a kind never met yet gets x unseenBoost, one not seen for a while recovers up to +staleMax, the last `recent` spawns are damped */
   spread: { unseenBoost:2.5, staleMax:1.2, staleSecs:150, recentN:3, recentMul:.25 },
-  spawn: { gap:3.6, grace:6, interval:{1:14,2:12,3:10,4:8.5,5:7}, minInterval:2.8, nightMul:.85, dayMul:1.1, darkMul:.5, darkExtraMax:1, sleepMul:2.0, sleepMaxGhosts:2, sleepDisturb:.6,
+  spawn: { preSleepMax:1, preSleepMul:1.6, preSleepHeavyMul:.25, preSleepHeavy:['blackout','mash','uiglitch','grab','blanket','underbed','bedshake','glass','windowghost','doorshake'], gap:3.6, grace:6, interval:{1:14,2:12,3:10,4:8.5,5:7}, minInterval:2.8, nightMul:.85, dayMul:1.1, darkMul:.5, darkExtraMax:1, sleepMul:2.0, sleepMaxGhosts:2, sleepDisturb:.6,
            rest:{ base:5, perLevel:.4, min:2.5 }, maxGhosts:[0,1,2,3,4,5], maxGhostsCap:7, doubleChance:.35 },
   ghostFear: { dolltail:5, windowghost:8, grab:16, bedshake:8, objlift:5, hauntportrait:9, floorprint:4, stalker:6, fallendoll:5, wallmark:4, rugmark:4, bookmove:3, missing:5, pillowgone:5, hand:8, spirit:10, walker:8, blood:6, object:5, objwarp:5, extra:8, flicker:4, blackout:16, uiglitch:3, grab:8,
                doorshake:9, mash:30, underbed:26, palm:7, blanket:10, vasebreak:9, wilt:5, glass:10, shadow:9 },
@@ -1609,10 +1609,16 @@ const Director = {
     const m = CONFIG.spawn.interval;
     const base = level >= 5 ? Math.max(CONFIG.spawn.minInterval, m[5] - (level - 5) * 0.4) : m[level];
     const sm = CONFIG.organic.spawnMul, org = sm.cool + (sm.hot - sm.cool) * S.skill;   // struggling -> a little more breathing room, doing well -> faster
-    return base * org * (UI.isNight() ? CONFIG.spawn.nightMul : CONFIG.spawn.dayMul) * (S.sleeping ? CONFIG.spawn.sleepMul : (!S.lightsOn ? CONFIG.spawn.darkMul : 1)) * rand(.8, 1.3);
+    return base * org * (UI.isNight() ? CONFIG.spawn.nightMul : CONFIG.spawn.dayMul) * (S.sleeping ? CONFIG.spawn.sleepMul : (!S.lightsOn ? CONFIG.spawn.darkMul : 1)) * (Director.preSleep() ? CONFIG.spawn.preSleepMul : 1) * rand(.8, 1.3);
   },
   schedule(){ S.nextSpawn = S.t + Director.interval(S.threat); },
+  /* evening: night has fallen but the pet is not asleep yet (getting ready for bed) - keep it calm and readable */
+  preSleep(){ return !S.sleeping && !S.collapsed && UI.isNight(); },
   maxGhosts(){
+    if(Director.preSleep()) return Math.min(CONFIG.spawn.preSleepMax, Director.maxGhostsBase());
+    return Director.maxGhostsBase();
+  },
+  maxGhostsBase(){
     const c = CONFIG.spawn, extra = S.threat > 5 ? Math.floor((S.threat - 5) / 2) : 0;
     return Math.min(c.maxGhostsCap, c.maxGhosts[Math.min(S.threat, 5)] + extra + (!S.lightsOn && !S.sleeping && S.threat >= 2 ? c.darkExtraMax : 0));
   },
@@ -1627,6 +1633,7 @@ const Director = {
       { const m = CONFIG.mix, p = Director.progress(); if(m.trace.indexOf(k) >= 0) x *= Math.max(m.traceMin, 1 - p / m.traceSecs); if(m.big.indexOf(k) >= 0) x *= 1 + Math.min(m.bigMax, p / m.bigSecs); }
       if(d.lit) x *= lit ? (k === 'grab' ? .3 : .6) : (k === 'grab' ? 1.2 : 1.3);
       if(k === 'blackout' && !lit) x *= .2;
+      if(Director.preSleep() && CONFIG.spawn.preSleepHeavy.indexOf(k) >= 0) x *= CONFIG.spawn.preSleepHeavyMul;
       if(k === 'blanket' && S.sleeping) x *= 2.5;
       if(k === 'underbed' && S.sleeping) x *= 2;
       if(lvl >= 4 && d.danger) x *= 1.2;
@@ -1642,11 +1649,12 @@ const Director = {
       for(const k of ks){ const g = Ghosts.create(k); if(g){ g.dmgMul = CONFIG.early.ambush.dmgMul; if(g.life > CONFIG.early.ambush.life) g.life = CONFIG.early.ambush.life; g.t = Math.min(g.t||0, 0); Log.add('Something is very wrong...', 'bad'); break; } }
     }
     if(!S.nextSpawn){ Director.schedule(); return; }
+    if(S.busy === 'toBed'){ S.nextSpawn = Math.max(S.nextSpawn || 0, S.t + 2); return; }   // never pile new ghosts onto the walk to bed
     if(S.t < S.nextSpawn || S.t < S.restUntil) return;
     if(S.t < (S.lastSpawnT || -99) + CONFIG.spawn.gap){ S.nextSpawn = (S.lastSpawnT || 0) + CONFIG.spawn.gap; return; }
     const max = S.sleeping ? Math.min(CONFIG.spawn.sleepMaxGhosts, Director.maxGhosts()) : Director.maxGhosts();
     if(S.ghosts.length >= max){ S.nextSpawn = S.t + 1; return; }
-    const P = CONFIG.pressure; let n = 1; if(S.threat >= P.doubleFrom && Math.random() < Math.min(P.doubleMax, CONFIG.spawn.doubleChance + P.doubleStep * (S.threat - P.doubleFrom)) && S.ghosts.length + 2 <= max) n = 2;
+    const P = CONFIG.pressure; let n = 1; if(S.threat >= P.doubleFrom && Math.random() < Math.min(P.doubleMax, CONFIG.spawn.doubleChance + P.doubleStep * (S.threat - P.doubleFrom)) && S.ghosts.length + 2 <= max && !Director.preSleep()) n = 2;
     let danger = false;
     for(let i = 0; i < n; i++){
       const k = pickWeighted(Director.weights()); if(!k) continue;
