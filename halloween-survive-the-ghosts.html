@@ -335,13 +335,13 @@ body.devopen{padding-right:316px}
     <div class="hpwrap"><span class="lbl">HP</span><div class="hpbar" role="img" aria-label="Health"><i id="hpFill"></i></div><b class="hpnum" id="hpNum">100</b></div>
     <div class="stats5" id="stats5"></div>
     <div class="info">
-      <span>Time <b id="iTime">00:00:00</b></span>
+      <span>Time <b id="iTime">00:00</b></span>
       <span>Threat <b id="iThreat">Lv1</b></span>
       <span>Difficulty <b id="iDiff">x1.0</b></span>
       <span id="iDay">☀ Day</span>
     </div>
     <div class="counters">
-      <span>Time <b id="cTime">00:00:00</b> <i id="bTime"></i></span>
+      <span>Time <b id="cTime">00:00</b> <i id="bTime"></i></span>
       <span>Ghosts found <b id="cFound">0</b> <i id="bFound"></i></span>
       <span>Cleared <b id="cKilled">0</b> <i id="bKilled"></i></span>
       <span>Anomalies fixed <b id="cAnom">0</b> <i id="bAnom"></i></span>
@@ -549,7 +549,7 @@ const $ = id => document.getElementById(id);
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 const rand = (a,b) => a + Math.random()*(b-a);
 const pick = arr => arr[Math.floor(Math.random()*arr.length)];
-const fmtTime = s => { const cs = Math.floor(Math.max(0, s) * 100), p2 = n => String(n).padStart(2,'0'); return p2(Math.floor(cs/6000)) + ':' + p2(Math.floor(cs/100)%60) + ':' + p2(cs%100); };
+const fmtTime = (s, cs) => { const t = Math.floor(Math.max(0, s) * 100), p2 = n => String(n).padStart(2,'0'); return p2(Math.floor(t/6000)) + ':' + p2(Math.floor(t/100)%60) + (cs ? ':' + p2(t%100) : ''); };
 function pickWeighted(map){
   let total = 0; for(const k in map) total += map[k];
   if(total <= 0) return null;
@@ -1985,7 +1985,7 @@ const Game = {
     Store.db.history.length = Math.min(Store.db.history.length, 30);
     Store.db.run = null; Store.save();
     Sfx.over(); UI.render();
-    $('oTime').textContent = fmtTime(S.t);
+    $('oTime').textContent = fmtTime(S.t, true);
     $('oKilled').textContent = S.killed; $('oFound').textContent = S.found; $('oDays').textContent = S.day;
     const rk = Game.rank(S.t), nx = CONFIG.ranks[rk + 1];
     Game.lastShare = 'My pet survived ' + fmtTime(S.t) + ' (Day ' + S.day + '). Rank: ' + CONFIG.ranks[rk][2] + ' ' + CONFIG.ranks[rk][1];
